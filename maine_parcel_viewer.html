@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Maine Parcel Viewer</title>
+    <title>Maine Parcel Viewer with Search</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -10,6 +10,16 @@
         #map {
             height: 100vh;
             width: 100%;
+        }
+        .search-box {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 8px;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
         }
         .legend {
             background: white;
@@ -30,6 +40,10 @@
     </style>
 </head>
 <body>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by FullName" />
+        <button onclick="searchParcels()">Search</button>
+    </div>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
@@ -39,26 +53,30 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
+        var parcelLayer;
         var ownerTypeColors = {
-    "Contractor": "#a6cee3",
-    "Family Forest": "#1f78b4",
-    "Federal": "#b2df8a",
-    "Industrial": "#33a02c",
-    "Municipal": "#fb9a99",
-    "New Family": "#e31a1c",
-    "Non-Profit Conservation": "#fdbf6f",
-    "Non-Profit Other": "#ff7f00",
-    "Old Family": "#cab2d6",
-    "Other": "#6a3d9a",
-    "REIT/TIMO": "#ffff99",
-    "State": "#b15928",
-    "Tribal": "#8dd3c7",
-};
+            "Contractor": "#a6cee3",
+            "Family Forest": "#1f78b4",
+            "Federal": "#b2df8a",
+            "Industrial": "#33a02c",
+            "Municipal": "#fb9a99",
+            "New Family": "#e31a1c",
+            "Non-Profit Conservation": "#fdbf6f",
+            "Non-Profit Other": "#ff7f00",
+            "Old Family": "#cab2d6",
+            "Other": "#6a3d9a",
+            "REIT/TIMO": "#ffff99",
+            "State": "#b15928",
+            "Tribal": "#8dd3c7"
+        };
 
-        fetch('maine_ownership.geojson')
+        var geojsonData;
+
+        fetch('maine_ownershi_FeaturesToJSO.geojson')
             .then(res => res.json())
             .then(data => {
-                L.geoJSON(data, {
+                geojsonData = data;
+                parcelLayer = L.geoJSON(data, {
                     onEachFeature: function (feature, layer) {
                         let props = feature.properties;
                         let popupContent = '<b>Parcel Attributes:</b><br><ul>';
@@ -81,29 +99,62 @@
                 }).addTo(map);
 
                 var legend = L.control({ position: "bottomright" });
-
                 legend.onAdd = function (map) {
                     var div = L.DomUtil.create("div", "info legend");
                     div.innerHTML += "<h4>Owner Type</h4>";
-                    div.innerHTML += '<i style="background: #a6cee3"></i> Contractor<br>';
-                    div.innerHTML += '<i style="background: #1f78b4"></i> Family Forest<br>';
-                    div.innerHTML += '<i style="background: #b2df8a"></i> Federal<br>';
-                    div.innerHTML += '<i style="background: #33a02c"></i> Industrial<br>';
-                    div.innerHTML += '<i style="background: #fb9a99"></i> Municipal<br>';
-                    div.innerHTML += '<i style="background: #e31a1c"></i> New Family<br>';
-                    div.innerHTML += '<i style="background: #fdbf6f"></i> Non-Profit Conservation<br>';
-                    div.innerHTML += '<i style="background: #ff7f00"></i> Non-Profit Other<br>';
-                    div.innerHTML += '<i style="background: #cab2d6"></i> Old Family<br>';
-                    div.innerHTML += '<i style="background: #6a3d9a"></i> Other<br>';
-                    div.innerHTML += '<i style="background: #ffff99"></i> REIT/TIMO<br>';
-                    div.innerHTML += '<i style="background: #b15928"></i> State<br>';
-                    div.innerHTML += '<i style="background: #8dd3c7"></i> Tribal<br>';
-
+                    for (let type in ownerTypeColors) {
+                        div.innerHTML += '<i style="background:' + ownerTypeColors[type] + '"></i> ' + type + "<br>";
+                    }
                     return div;
                 };
-
                 legend.addTo(map);
             });
+
+        function searchParcels() {
+            var input = document.getElementById("searchInput").value.toLowerCase();
+            if (!input || !geojsonData) return;
+
+            var matches = [];
+
+            geojsonData.features.forEach(function (feature) {
+                var name = feature.properties.FullName || "";
+                if (name.toLowerCase().includes(input)) {
+                    matches.push(feature);
+                }
+            });
+
+            if (matches.length === 0) {
+                alert("No matches found.");
+                return;
+            }
+
+            if (parcelLayer) {
+                map.removeLayer(parcelLayer);
+            }
+
+            parcelLayer = L.geoJSON(matches, {
+                onEachFeature: function (feature, layer) {
+                    let props = feature.properties;
+                    let popupContent = '<b>Parcel Attributes:</b><br><ul>';
+                    for (let key in props) {
+                        popupContent += `<li><b>${key}:</b> ${props[key]}</li>`;
+                    }
+                    popupContent += '</ul>';
+                    layer.bindPopup(popupContent).openPopup();
+                },
+                style: {
+                    color: "#000",
+                    weight: 2,
+                    fillColor: "#ffff00",
+                    fillOpacity: 0.7
+                }
+            }).addTo(map);
+
+            var bounds = parcelLayer.getBounds();
+            if (bounds.isValid()) {
+                map.fitBounds(bounds);
+            }
+        }
     </script>
 </body>
 </html>
