@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -44,6 +45,15 @@
     </style>
 </head>
 <body>
+
+<script>
+  var password = prompt("Enter the password to view this page:");
+  if (password !== "Owner2024") {
+    alert("Incorrect password. Access denied.");
+    document.body.innerHTML = "<h2 style='text-align:center; margin-top:20%'>Access Denied</h2>";
+  }
+</script>
+
     <div class="search-box">
         <input type="text" id="searchInput" placeholder="Search by FullName" oninput="handleFullNameInput()" />
         <button onclick="searchParcels()">Search Name</button><br>
