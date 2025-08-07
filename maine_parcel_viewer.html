@@ -1,8 +1,7 @@
-
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Maine Parcel Viewer with Search</title>
+    <title>Maine Parcel Viewer with Combined Search</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -17,9 +16,14 @@
             right: 10px;
             z-index: 1000;
             background: white;
-            padding: 8px;
-            border-radius: 4px;
+            padding: 10px;
+            border-radius: 6px;
             box-shadow: 0 0 5px rgba(0,0,0,0.3);
+            font-family: sans-serif;
+        }
+        .search-box input, .search-box select, .search-box button {
+            margin-bottom: 6px;
+            width: 200px;
         }
         .legend {
             background: white;
@@ -41,9 +45,27 @@
 </head>
 <body>
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Search by FullName" />
-        <button onclick="searchParcels()">Search</button>
+        <input type="text" id="searchInput" placeholder="Search by FullName" oninput="handleFullNameInput()" />
+        <button onclick="searchParcels()">Search Name</button><br>
+        <select id="ownerDropdown">
+            <option value="">-- Select OwnerType --</option>
+            <option>Contractor</option>
+            <option>Family Forest</option>
+            <option>Federal</option>
+            <option>Industrial</option>
+            <option>Municipal</option>
+            <option>New Family</option>
+            <option>Non-Profit Conservation</option>
+            <option>Non-Profit Other</option>
+            <option>Old Family</option>
+            <option>Other</option>
+            <option>REIT/TIMO</option>
+            <option>State</option>
+            <option>Tribal</option>
+        </select>
+        <button onclick="searchByOwnerType()">Search OwnerType</button>
     </div>
+
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
@@ -54,6 +76,8 @@
         }).addTo(map);
 
         var parcelLayer;
+        var geojsonData;
+
         var ownerTypeColors = {
             "Contractor": "#a6cee3",
             "Family Forest": "#1f78b4",
@@ -70,33 +94,11 @@
             "Tribal": "#8dd3c7"
         };
 
-        var geojsonData;
-
         fetch('maine_ownership.geojson')
             .then(res => res.json())
             .then(data => {
                 geojsonData = data;
-                parcelLayer = L.geoJSON(data, {
-                    onEachFeature: function (feature, layer) {
-                        let props = feature.properties;
-                        let popupContent = '<b>Parcel Attributes:</b><br><ul>';
-                        for (let key in props) {
-                            popupContent += `<li><b>${key}:</b> ${props[key]}</li>`;
-                        }
-                        popupContent += '</ul>';
-                        layer.bindPopup(popupContent);
-                    },
-                    style: function(feature) {
-                        let ownerType = feature.properties.OwnerType;
-                        let fill = ownerTypeColors[ownerType] || "#cccccc";
-                        return {
-                            color: "#555",
-                            weight: 1,
-                            fillColor: fill,
-                            fillOpacity: 0.6
-                        };
-                    }
-                }).addTo(map);
+                resetMapToAllParcels();
 
                 var legend = L.control({ position: "bottomright" });
                 legend.onAdd = function (map) {
@@ -110,29 +112,57 @@
                 legend.addTo(map);
             });
 
+        function handleFullNameInput() {
+            const input = document.getElementById("searchInput").value.trim();
+            if (input === "") {
+                resetMapToAllParcels();
+            }
+        }
+
         function searchParcels() {
-            var input = document.getElementById("searchInput").value.toLowerCase();
-            if (!input || !geojsonData) return;
+            var input = document.getElementById("searchInput").value.toLowerCase().trim();
+            if (!input || !geojsonData) {
+                resetMapToAllParcels();
+                return;
+            }
 
-            var matches = [];
-
-            geojsonData.features.forEach(function (feature) {
-                var name = feature.properties.FullName || "";
-                if (name.toLowerCase().includes(input)) {
-                    matches.push(feature);
-                }
-            });
+            var matches = geojsonData.features.filter(f =>
+                (f.properties.FullName || "").toLowerCase().includes(input)
+            );
 
             if (matches.length === 0) {
                 alert("No matches found.");
                 return;
             }
 
+            updateMapWithFeatures(matches);
+        }
+
+        function searchByOwnerType() {
+            var selected = document.getElementById("ownerDropdown").value;
+            if (!selected || !geojsonData) {
+                resetMapToAllParcels();
+                return;
+            }
+
+            var matches = geojsonData.features.filter(f =>
+                f.properties.OwnerType === selected
+            );
+
+            if (matches.length === 0) {
+                alert("No matches found.");
+                return;
+            }
+
+            updateMapWithFeatures(matches);
+        }
+
+        function updateMapWithFeatures(features) {
             if (parcelLayer) {
                 map.removeLayer(parcelLayer);
             }
 
-            parcelLayer = L.geoJSON(matches, {
+            parcelLayer = L.geoJSON(features, {
                 onEachFeature: function (feature, layer) {
                     let props = feature.properties;
                     let popupContent = '<b>Parcel Attributes:</b><br><ul>';
@@ -154,6 +184,34 @@
             if (bounds.isValid()) {
                 map.fitBounds(bounds);
             }
+        }
+
+        function resetMapToAllParcels() {
+            if (parcelLayer) {
+                map.removeLayer(parcelLayer);
+            }
+
+            parcelLayer = L.geoJSON(geojsonData, {
+                onEachFeature: function (feature, layer) {
+                    let props = feature.properties;
+                    let popupContent = '<b>Parcel Attributes:</b><br><ul>';
+                    for (let key in props) {
+                        popupContent += `<li><b>${key}:</b> ${props[key]}</li>`;
+                    }
+                    popupContent += '</ul>';
+                    layer.bindPopup(popupContent);
+                },
+                style: function(feature) {
+                    let ownerType = feature.properties.OwnerType;
+                    let fill = ownerTypeColors[ownerType] || "#cccccc";
+                    return {
+                        color: "#555",
+                        weight: 1,
+                        fillColor: fill,
+                        fillOpacity: 0.6
+                    };
+                }
+            }).addTo(map);
         }
     </script>
 </body>
