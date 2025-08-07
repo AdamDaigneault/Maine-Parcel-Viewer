@@ -1,0 +1,109 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Maine Parcel Viewer</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        .legend {
+            background: white;
+            padding: 10px;
+            line-height: 18px;
+            color: #333;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([45.25, -69.0], 7);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var ownerTypeColors = {
+    "Contractor": "#a6cee3",
+    "Family Forest": "#1f78b4",
+    "Federal": "#b2df8a",
+    "Industrial": "#33a02c",
+    "Municipal": "#fb9a99",
+    "New Family": "#e31a1c",
+    "Non-Profit Conservation": "#fdbf6f",
+    "Non-Profit Other": "#ff7f00",
+    "Old Family": "#cab2d6",
+    "Other": "#6a3d9a",
+    "REIT/TIMO": "#ffff99",
+    "State": "#b15928",
+    "Tribal": "#8dd3c7",
+};
+
+        fetch('maine_ownership.geojson')
+            .then(res => res.json())
+            .then(data => {
+                L.geoJSON(data, {
+                    onEachFeature: function (feature, layer) {
+                        let props = feature.properties;
+                        let popupContent = '<b>Parcel Attributes:</b><br><ul>';
+                        for (let key in props) {
+                            popupContent += `<li><b>${key}:</b> ${props[key]}</li>`;
+                        }
+                        popupContent += '</ul>';
+                        layer.bindPopup(popupContent);
+                    },
+                    style: function(feature) {
+                        let ownerType = feature.properties.OwnerType;
+                        let fill = ownerTypeColors[ownerType] || "#cccccc";
+                        return {
+                            color: "#555",
+                            weight: 1,
+                            fillColor: fill,
+                            fillOpacity: 0.6
+                        };
+                    }
+                }).addTo(map);
+
+                var legend = L.control({ position: "bottomright" });
+
+                legend.onAdd = function (map) {
+                    var div = L.DomUtil.create("div", "info legend");
+                    div.innerHTML += "<h4>Owner Type</h4>";
+                    div.innerHTML += '<i style="background: #a6cee3"></i> Contractor<br>';
+                    div.innerHTML += '<i style="background: #1f78b4"></i> Family Forest<br>';
+                    div.innerHTML += '<i style="background: #b2df8a"></i> Federal<br>';
+                    div.innerHTML += '<i style="background: #33a02c"></i> Industrial<br>';
+                    div.innerHTML += '<i style="background: #fb9a99"></i> Municipal<br>';
+                    div.innerHTML += '<i style="background: #e31a1c"></i> New Family<br>';
+                    div.innerHTML += '<i style="background: #fdbf6f"></i> Non-Profit Conservation<br>';
+                    div.innerHTML += '<i style="background: #ff7f00"></i> Non-Profit Other<br>';
+                    div.innerHTML += '<i style="background: #cab2d6"></i> Old Family<br>';
+                    div.innerHTML += '<i style="background: #6a3d9a"></i> Other<br>';
+                    div.innerHTML += '<i style="background: #ffff99"></i> REIT/TIMO<br>';
+                    div.innerHTML += '<i style="background: #b15928"></i> State<br>';
+                    div.innerHTML += '<i style="background: #8dd3c7"></i> Tribal<br>';
+
+                    return div;
+                };
+
+                legend.addTo(map);
+            });
+    </script>
+</body>
+</html>
